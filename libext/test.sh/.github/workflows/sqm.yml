@@ -1,0 +1,11 @@
+name: Software Quality Management
+on: [pull_request, push]
+jobs:
+  Testing:
+    runs-on: ubuntu-18.04
+    steps:
+      - uses: actions/checkout@v2.3.4
+      - run: sbin/provision
+      - run: sbin/format -c
+      - run: sbin/lint
+      - run: sbin/test

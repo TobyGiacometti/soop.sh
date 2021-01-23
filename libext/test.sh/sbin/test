@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+
+set -o errtrace
+set -o pipefail
+
+#---
+# @stdout Help
+print_help() {
+	cat <<-EOF
+		Run tests.
+
+		Usage:
+		  $script_name
+		  $script_name -h
+
+		Options:
+		  -h  Print help.
+	EOF
+}
+
+#---
+# @param $1 Section title
+# @stdin Section text
+# @stdout Formatted section text
+print_section() {
+	local line
+
+	if [[ -z $1 ]]; then
+		echo "Title is required." >&2
+		exit 1
+	fi
+
+	while IFS= read -r line || [[ -n $line ]]; do
+		printf "$tty_fg_blue%s$tty_reset" "[$1] "
+		case $line in
+			"not ok"* | Dubious* | "No subtests run"*)
+				printf "$tty_fg_red%s$tty_reset\n" "$line"
+				;;
+			*)
+				echo "$line"
+				;;
+		esac
+	done
+	echo ""
+}
+
+tty_fg_red="\033[31m"
+tty_fg_green="\033[32m"
+tty_fg_blue="\033[34m"
+tty_reset="\033[0m"
+script_name=$(basename "$0")
+project_dir=$(cd "$(dirname "$0")/.." &>/dev/null && pwd) || exit
+shells=(posh dash ksh bash)
+exit_status=0
+
+while getopts :h option; do
+	case $option in
+		h)
+			print_help
+			exit
+			;;
+		\?)
+			echo "Option is unknown: -$OPTARG" >&2
+			exit 1
+			;;
+	esac
+done
+
+cd "$project_dir" || exit
+
+for shell in "${shells[@]}"; do
+	prove --shuffle --ext sh --failures --comments --parse --exec "$shell" \
+		| print_section "$shell" || exit_status=1
+done
+
+if [[ $exit_status -eq 0 ]]; then
+	printf "$tty_fg_green%s$tty_reset\n" PASS
+else
+	printf "$tty_fg_red%s$tty_reset\n" FAIL
+fi
+
+exit "$exit_status"
