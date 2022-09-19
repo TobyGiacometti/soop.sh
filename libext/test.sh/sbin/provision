@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+
+# shellcheck source=/dev/null
+test -f /etc/os-release && . "$_"
+if [[ $ID != ubuntu || $VERSION_ID != 22.04 ]]; then
+	echo "Only Ubuntu 22.04 LTS (Jammy Jellyfish) is supported." >&2
+	exit 1
+fi
+
+set -o errtrace
+set -o pipefail
+
+trap '[[ $? -ne 0 && -s $output_log ]] && cat -- "$output_log" >&3' EXIT
+
+tmp_dir=$(mktemp --directory) || exit
+output_log=$tmp_dir/output.log
+
+echo "Development environment is being provisioned..."
+
+# From now on, we will redirect any output to a logfile so that we can keep the
+# output clean during provisioning.
+exec 3>&2 >>"$output_log" 2>&1
+
+cd -- "$tmp_dir" || exit
+
+sudo apt-get update || exit
+sudo apt-get install --assume-yes shellcheck shfmt posh ksh

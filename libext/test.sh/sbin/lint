@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -o errtrace
+set -o pipefail
+shopt -s globstar || exit
+
+#---
+# @stdout Help
+print_help() {
+	cat <<-EOF
+		Lint the project's files.
+
+		Usage:
+		  $script_name
+		  $script_name -h
+
+		Options:
+		  -h  Print help.
+	EOF
+}
+
+script_name=$(basename -- "$0")
+project_dir=$(cd -- "$(dirname -- "$0")/.." &>/dev/null && pwd) || exit
+# shellcheck disable=SC2125
+GLOBIGNORE=$project_dir/.git/*:$project_dir/t/*
+shebang_regex='^#!\s?/(usr/)?bin/(env\s+)?(sh|bash)$'
+
+while getopts :h option; do
+	case $option in
+		h)
+			print_help
+			exit
+			;;
+		\?)
+			echo "Option is unknown: -$OPTARG" >&2
+			exit 1
+			;;
+	esac
+done
+
+paths=("$project_dir"/**/*)
+for path in "${paths[@]}"; do
+	if [[ ! -r $path ]]; then
+		echo "Not readable: $path" >&2
+		exit 1
+	elif [[ ! -f $path ]]; then
+		continue # We can ignore directories that were matched by globstar.
+	elif [[ $path = *.sh ]]; then
+		shellcheck_files+=("$path")
+	elif [[ ${path##*/} != *.* ]] \
+		&& read -r shebang <"$path" \
+		&& [[ $shebang =~ $shebang_regex ]]; then
+		if [[ ${BASH_REMATCH[3]} = bash || ${BASH_REMATCH[3]} = sh ]]; then
+			shellcheck_files+=("$path")
+		fi
+	fi
+done
+
+shellcheck -- "${shellcheck_files[@]}"
